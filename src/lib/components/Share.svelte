@@ -3,7 +3,7 @@
   import * as Dialog from '$/components/ui/dialog';
   import { Separator } from '$/components/ui/separator';
   import { env } from '$/util/env';
-  import { urlsStore } from '$/util/state';
+  import { diagramEngineStore, urlsStore } from '$/util/state';
   import ShareIcon from '~icons/material-symbols/share';
   import CopyInput from './CopyInput.svelte';
   import MermaidChartIcon from './MermaidChartIcon.svelte';
@@ -30,7 +30,7 @@
           The content of the diagrams you create never leaves your browser.
         </Dialog.Description>
       </div>
-      {#if env.isEnabledMermaidChartLinks}
+      {#if env.isEnabledMermaidChartLinks && $diagramEngineStore.id === 'mermaid' && typeof $urlsStore.mermaidChart === 'function'}
         <Separator />
         <div class="flex flex-col gap-2">
           <h2 class="flex items-center gap-2">

@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { EditorProps } from '$/types';
   import { stateStore } from '$/util/state';
+  import { getDiagramEngine } from '$lib/diagram';
   import { initEditor } from '$lib/util/monacoExtra';
   import { errorDebug } from '$lib/util/util';
   import { mode } from 'mode-watcher';
@@ -21,16 +22,20 @@
   } satisfies monaco.editor.IStandaloneEditorConstructionOptions;
   let currentText = '';
 
-  const jsonModel = monaco.editor.createModel(
-    '',
-    'json',
-    monaco.Uri.parse('internal://config.json')
-  );
-  const mermaidModel = monaco.editor.createModel(
-    '',
-    'mermaid',
-    monaco.Uri.parse('internal://mermaid.mmd')
-  );
+  const models: Record<string, monaco.editor.ITextModel> = {};
+
+  const getModel = (language: string, type: 'code' | 'config') => {
+    const key = `${type}:${language}`;
+    if (!models[key]) {
+      const extension = language === 'json' ? 'json' : 'txt';
+      models[key] = monaco.editor.createModel(
+        '',
+        language,
+        monaco.Uri.parse(`internal://${type}-${language}.${extension}`)
+      );
+    }
+    return models[key];
+  };
 
   onMount(() => {
     self.MonacoEnvironment = {
@@ -69,28 +74,34 @@
       onUpdate(currentText);
     });
 
-    const unsubscribeState = stateStore.subscribe(({ errorMarkers, editorMode, code, mermaid }) => {
-      if (!editor) {
-        return;
+    const unsubscribeState = stateStore.subscribe(
+      ({ errorMarkers, editorMode, code, config, diagram }) => {
+        if (!editor) {
+          return;
+        }
+
+        const engine = getDiagramEngine(diagram);
+        const codeModel = getModel(engine.codeEditorLanguage, 'code');
+        const configLanguage = engine.configEditorLanguage ?? 'json';
+        const configModel = getModel(configLanguage, 'config');
+        const model = editorMode === 'code' || !engine.hasConfig ? codeModel : configModel;
+
+        if (editor.getModel()?.id !== model.id) {
+          editor.setModel(model);
+        }
+
+        // Update editor text if it's different
+        const newText = editorMode === 'code' || !engine.hasConfig ? code : config;
+        if (newText !== currentText) {
+          editor.setScrollTop(0);
+          editor.setValue(newText);
+          currentText = newText;
+        }
+
+        // Display/clear errors
+        monaco.editor.setModelMarkers(model, engine.id, errorMarkers);
       }
-
-      const model = editorMode === 'code' ? mermaidModel : jsonModel;
-
-      if (editor.getModel()?.id !== model.id) {
-        editor.setModel(model);
-      }
-
-      // Update editor text if it's different
-      const newText = editorMode === 'code' ? code : mermaid;
-      if (newText !== currentText) {
-        editor.setScrollTop(0);
-        editor.setValue(newText);
-        currentText = newText;
-      }
-
-      // Display/clear errors
-      monaco.editor.setModelMarkers(model, 'mermaid', errorMarkers);
-    });
+    );
 
     const unsubscribeMode = mode.subscribe((mode) => {
       if (editor) {
@@ -112,8 +123,7 @@
       unsubscribeState();
       unsubscribeMode();
       resizeObserver.disconnect();
-      jsonModel.dispose();
-      mermaidModel.dispose();
+      Object.values(models).forEach((model) => model.dispose());
       editor?.dispose();
     };
   });

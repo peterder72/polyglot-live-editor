@@ -1,10 +1,10 @@
 <script lang="ts">
   import type { EditorProps } from '$/types';
   import { stateStore } from '$/util/state';
-  import { json, jsonLanguage } from '@codemirror/lang-json';
+  import { getDiagramEngine } from '$lib/diagram';
+  import { json } from '@codemirror/lang-json';
   import { markdown } from '@codemirror/lang-markdown';
   import { yamlFrontmatter } from '@codemirror/lang-yaml';
-  import { language } from '@codemirror/language';
   import { Compartment, EditorState } from '@codemirror/state';
   import { EditorView } from '@codemirror/view';
   import { vsCodeDark } from '@fsegurai/codemirror-theme-vscode-dark';
@@ -18,6 +18,30 @@
   let currentText = $state('');
 
   const { onUpdate }: EditorProps = $props();
+  let currentLanguageKey = '';
+
+  const getCodeExtension = (engine: ReturnType<typeof getDiagramEngine>) => {
+    switch (engine.mobileLanguage) {
+      case 'yaml-frontmatter':
+        return yamlFrontmatter({ content: markdown() });
+      case 'markdown':
+        return markdown();
+      default:
+        return [];
+    }
+  };
+
+  const getConfigExtension = (engine: ReturnType<typeof getDiagramEngine>) => {
+    if (!engine.hasConfig) {
+      return [];
+    }
+    switch (engine.configEditorLanguage) {
+      case 'json':
+        return json();
+      default:
+        return markdown();
+    }
+  };
 
   onMount(() => {
     const themeCompartment = new Compartment();
@@ -62,8 +86,10 @@
       });
     });
 
-    const unsubscribeState = stateStore.subscribe(({ editorMode, code, mermaid }) => {
-      const text = editorMode === 'code' ? code : mermaid;
+    const unsubscribeState = stateStore.subscribe(({ editorMode, code, config, diagram }) => {
+      const engine = getDiagramEngine(diagram);
+      const isConfigMode = editorMode === 'config' && engine.hasConfig;
+      const text = isConfigMode ? config : code;
       if (currentText === text || !editorView) {
         return;
       }
@@ -75,17 +101,14 @@
           insert: text
         }
       });
-      const stateLanguage = editorView.state.facet(language);
-      const isStateJson = stateLanguage === jsonLanguage;
-      const isCodeJson = editorMode === 'config';
-      if (stateLanguage && isStateJson === isCodeJson) {
-        return;
+      const nextLanguageKey = `${isConfigMode ? 'config' : 'code'}:${engine.id}`;
+      if (nextLanguageKey !== currentLanguageKey) {
+        currentLanguageKey = nextLanguageKey;
+        const extension = isConfigMode ? getConfigExtension(engine) : getCodeExtension(engine);
+        editorView.dispatch({
+          effects: languageCompartment.reconfigure(extension)
+        });
       }
-      editorView.dispatch({
-        effects: languageCompartment.reconfigure(
-          isCodeJson ? json() : yamlFrontmatter({ content: markdown() })
-        )
-      });
     });
 
     return () => {

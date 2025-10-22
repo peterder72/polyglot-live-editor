@@ -1,3 +1,4 @@
+import type { DiagramID } from '$lib/diagram';
 import type { Component } from 'svelte';
 import type { HTMLInputTypeAttribute } from 'svelte/elements';
 import 'unplugin-icons/types/svelte';
@@ -24,7 +25,7 @@ export interface Tab {
 
 export interface State {
   code: string;
-  mermaid: string;
+  config: string;
   updateDiagram: boolean;
   rough: boolean;
   // All new options must be optional, as users would have old states saved
@@ -35,9 +36,15 @@ export interface State {
   pan?: { x: number; y: number };
   zoom?: number;
   loader?: LoaderConfig;
+  diagram?: DiagramID;
+  /**
+   * @deprecated legacy field retained to read persisted states created before the PlantUML refactor.
+   */
+  mermaid?: string;
 }
 
 export interface ValidatedState extends State {
+  diagram: DiagramID;
   editorMode: EditorMode;
   diagramType?: string;
   error?: Error;

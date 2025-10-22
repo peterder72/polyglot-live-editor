@@ -11,7 +11,7 @@
   import { getDomain } from '$/util/util';
   import { browser } from '$app/environment';
   import { waitForRender } from '$lib/util/autoSync';
-  import { inputStateStore, stateStore, urlsStore } from '$lib/util/state';
+  import { diagramEngineStore, inputStateStore, stateStore, urlsStore } from '$lib/util/state';
   import { logEvent } from '$lib/util/stats';
   import { version as FAVersion } from '@fortawesome/fontawesome-free/package.json';
   import dayjs from 'dayjs';
@@ -25,7 +25,7 @@
   type Exporter = (context: CanvasRenderingContext2D, image: HTMLImageElement) => () => void;
 
   const getFileName = (extension: string) =>
-    `mermaid-diagram-${dayjs().format('YYYY-MM-DD-HHmmss')}.${extension}`;
+    `${$diagramEngineStore.id}-diagram-${dayjs().format('YYYY-MM-DD-HHmmss')}.${extension}`;
 
   const getSvgElement = () => {
     const svgElement = document.querySelector('#container svg')?.cloneNode(true) as HTMLElement;
@@ -50,7 +50,9 @@
       svg = getSvgElement();
     }
 
-    svg.style.backgroundColor = window.getComputedStyle(document.body).getPropertyValue('--background');
+    svg.style.backgroundColor = window
+      .getComputedStyle(document.body)
+      .getPropertyValue('--background');
 
     const svgString = svg.outerHTML
       .replaceAll('<br>', '<br/>')

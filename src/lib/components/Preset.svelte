@@ -1,8 +1,7 @@
 <script lang="ts">
   import Card from '$/components/Card/Card.svelte';
   import { Button } from '$/components/ui/button';
-  import { getSampleDiagrams } from '$/util/mermaid';
-  import { updateCode } from '$lib/util/state';
+  import { diagramEngineStore, updateCode } from '$lib/util/state';
   import { logEvent } from '$lib/util/stats';
   import ShapesIcon from '~icons/material-symbols/account-tree-outline-rounded';
 
@@ -33,7 +32,14 @@
     `
   };
 
-  const samples = { ...getSampleDiagrams(), ...extras } as const;
+  const samples = $derived(() => {
+    const baseSamples = $diagramEngineStore.sampleDiagrams;
+    if ($diagramEngineStore.id === 'mermaid') {
+      return { ...baseSamples, ...extras };
+    }
+    return baseSamples;
+  });
+
   const loadSampleDiagram = (diagramType: string): void => {
     updateCode(samples[diagramType], {
       resetPanZoom: true,
@@ -51,12 +57,12 @@
     'Mindmap'
   ];
 
-  const diagramOrder = [
+  const diagramOrder = $derived(() => [
     ...mainDiagrams,
     ...Object.keys(samples)
       .filter((key) => !mainDiagrams.includes(key))
       .sort()
-  ];
+  ]);
 </script>
 
 <Card title="Sample Diagrams" isOpen isStackable icon={{ component: ShapesIcon }}>

@@ -91,9 +91,14 @@
         if (svg.length > 0) {
           // eslint-disable-next-line svelte/no-dom-manipulating
           container.innerHTML = svg;
-          let graphDiv = document.querySelector<SVGSVGElement>(`#${viewID}`);
+          let graphDiv =
+            container.querySelector<SVGSVGElement>(`#${viewID}`) ??
+            container.querySelector<SVGSVGElement>('svg');
           if (!graphDiv) {
             throw new Error('graph-div not found');
+          }
+          if (!graphDiv.id) {
+            graphDiv.id = viewID;
           }
           if (state.rough) {
             const svg2roughjs = new Svg2Roughjs('#container');

@@ -88,7 +88,10 @@
         if (svg.length > 0) {
           // eslint-disable-next-line svelte/no-dom-manipulating
           container.innerHTML = svg;
-          let graphDiv = document.querySelector<SVGSVGElement>(`#${viewID}`);
+          let graphDiv = container.querySelector<SVGSVGElement>(`#${viewID}`);
+          if (!graphDiv) {
+            graphDiv = container.querySelector<SVGSVGElement>('svg');
+          }
           if (!graphDiv) {
             throw new Error('graph-div not found');
           }
@@ -97,7 +100,7 @@
             svg2roughjs.svg = graphDiv;
             await svg2roughjs.sketch();
             graphDiv.remove();
-            const sketch = document.querySelector<SVGSVGElement>('#container > svg');
+            const sketch = container.querySelector<SVGSVGElement>('svg');
             if (!sketch) {
               throw new Error('sketch not found');
             }
@@ -111,6 +114,7 @@
             graphDiv = sketch;
           } else {
             graphDiv.setAttribute('height', '100%');
+            graphDiv.setAttribute('width', '100%');
             graphDiv.style.maxWidth = '100%';
             if (bindFunctions) {
               bindFunctions(graphDiv);

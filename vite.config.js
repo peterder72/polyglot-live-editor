@@ -46,6 +46,11 @@ export default defineConfig({
       '**/{karma,rollup,webpack,vite,vitest,jest,ava,babel,nyc,cypress,tsup,build,eslint,prettier}.config.*'
     ],
     setupFiles: ['./src/tests/setup.ts'],
+    server: {
+      deps: {
+        inline: ['@mermaid-js/layout-tidy-tree', 'non-layered-tidy-tree-layout']
+      }
+    },
     coverage: {
       exclude: ['src/mocks', '.svelte-kit', 'src/**/*.test.ts'],
       reporter: ['text', 'json', 'html', 'lcov']

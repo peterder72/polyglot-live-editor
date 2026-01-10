@@ -41,6 +41,47 @@
     }
   };
 
+  const parseSvgLength = (value?: string | null) => {
+    if (!value) {
+      return undefined;
+    }
+    const numeric = Number.parseFloat(value);
+    return Number.isFinite(numeric) ? numeric : undefined;
+  };
+
+  const normalizePlantumlSvg = (graphDiv: SVGSVGElement) => {
+    graphDiv.style.backgroundColor = 'transparent';
+    const width = parseSvgLength(graphDiv.getAttribute('width'));
+    const height = parseSvgLength(graphDiv.getAttribute('height'));
+    if (!graphDiv.getAttribute('viewBox') && width && height) {
+      graphDiv.setAttribute('viewBox', `0 0 ${width} ${height}`);
+    }
+    if (!width || !height) {
+      return;
+    }
+    const backgroundRects = Array.from(graphDiv.querySelectorAll('rect'));
+    for (const rect of backgroundRects) {
+      const fill = rect.getAttribute('fill')?.toLowerCase();
+      const rectWidth = parseSvgLength(rect.getAttribute('width'));
+      const rectHeight = parseSvgLength(rect.getAttribute('height'));
+      const rectX = parseSvgLength(rect.getAttribute('x')) ?? 0;
+      const rectY = parseSvgLength(rect.getAttribute('y')) ?? 0;
+      const isWhiteFill = fill && ['#ffffff', '#fff', 'white', 'rgb(255,255,255)'].includes(fill);
+      if (
+        isWhiteFill &&
+        rectWidth &&
+        rectHeight &&
+        rectWidth >= width &&
+        rectHeight >= height &&
+        rectX === 0 &&
+        rectY === 0
+      ) {
+        rect.setAttribute('fill', 'transparent');
+        rect.setAttribute('stroke', 'none');
+      }
+    }
+  };
+
   const handleStateChange = async (state: ValidatedState) => {
     const startTime = Date.now();
     if (state.error !== undefined) {
@@ -116,13 +157,19 @@
             sketch.setAttribute('width', '100%');
             sketch.setAttribute('viewBox', `0 0 ${width} ${height}`);
             sketch.style.maxWidth = '100%';
+            sketch.style.maxHeight = '100%';
             graphDiv = sketch;
           } else {
             graphDiv.setAttribute('height', '100%');
+            graphDiv.setAttribute('width', '100%');
             graphDiv.style.maxWidth = '100%';
+            graphDiv.style.maxHeight = '100%';
             if (bindFunctions) {
               bindFunctions(graphDiv);
             }
+          }
+          if (state.diagram === 'plantuml') {
+            normalizePlantumlSvg(graphDiv);
           }
           if (state.panZoom) {
             handlePanZoom(state, graphDiv);

@@ -83,7 +83,7 @@ const getStateFromGist = (gist: GistData, gistURL: string = gist.url): State => 
     }
   };
   if (gist.config) {
-    state.mermaid = gist.config;
+    state.config = gist.config;
   }
   return state;
 };

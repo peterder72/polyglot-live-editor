@@ -2,6 +2,7 @@
   import Actions from '$/components/Actions.svelte';
   import Card from '$/components/Card/Card.svelte';
   import DiagramDocButton from '$/components/DiagramDocumentationButton.svelte';
+  import DiagramEngineSelect from '$/components/DiagramEngineSelect.svelte';
   import Editor from '$/components/Editor.svelte';
   import History from '$/components/History/History.svelte';
   import McWrapper from '$/components/McWrapper.svelte';
@@ -19,7 +20,7 @@
   import View from '$/components/View.svelte';
   import type { EditorMode, Tab } from '$/types';
   import { PanZoomState } from '$/util/panZoom';
-  import { stateStore, updateCodeStore, urlsStore } from '$/util/state';
+  import { diagramEngineStore, stateStore, updateCodeStore, urlsStore } from '$/util/state';
   import { logEvent } from '$/util/stats';
   import { initHandler } from '$/util/util';
   import { onMount } from 'svelte';
@@ -30,11 +31,14 @@
   const panZoomState = new PanZoomState();
 
   const tabSelectHandler = (tab: Tab) => {
+    if (tab.id === 'config' && !$diagramEngineStore.hasConfig) {
+      return;
+    }
     const editorMode: EditorMode = tab.id === 'code' ? 'code' : 'config';
     updateCodeStore({ editorMode });
   };
 
-  const editorTabs: Tab[] = [
+  const baseEditorTabs: Tab[] = [
     {
       icon: CodeIcon,
       id: 'code',
@@ -46,6 +50,8 @@
       title: 'Config'
     }
   ];
+
+  let editorTabs = $derived($diagramEngineStore.hasConfig ? baseEditorTabs : [baseEditorTabs[0]]);
 
   let width = $state(0);
   let isMobile = $derived(width < 640);
@@ -86,16 +92,18 @@
       <HistoryIcon />
     </Toggle>
     <Share />
-    <McWrapper>
-      <Button
-        variant="accent"
-        size="sm"
-        href={$urlsStore.mermaidChart({ medium: 'save_diagram' }).save}
-        target="_blank">
-        <MermaidChartIcon />
-        Save diagram
-      </Button>
-    </McWrapper>
+    {#if $diagramEngineStore.id === 'mermaid' && typeof $urlsStore.mermaidChart === 'function'}
+      <McWrapper>
+        <Button
+          variant="accent"
+          size="sm"
+          href={$urlsStore.mermaidChart({ medium: 'save_diagram' }).save}
+          target="_blank">
+          <MermaidChartIcon />
+          Save diagram
+        </Button>
+      </McWrapper>
+    {/if}
   </Navbar>
 
   <div class="flex flex-1 flex-col overflow-hidden" bind:clientWidth={width}>
@@ -123,6 +131,7 @@
             </Card>
 
             <div class="group flex flex-wrap justify-between gap-4 sm:gap-6">
+              <DiagramEngineSelect />
               <Preset />
               <Actions />
             </div>

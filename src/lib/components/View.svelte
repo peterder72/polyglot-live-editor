@@ -1,13 +1,12 @@
 <script lang="ts">
   import type { State, ValidatedState } from '$/types';
   import { recordRenderTime, shouldRefreshView } from '$/util/autoSync';
-  import { render as renderDiagram } from '$/util/mermaid';
+  import { renderDiagram } from '$lib/diagram';
   import { PanZoomState } from '$/util/panZoom';
   import { inputStateStore, stateStore, updateCodeStore } from '$/util/state';
   import { logEvent, saveStatistics } from '$/util/stats';
   import FontAwesome, { mayContainFontAwesome } from '$lib/components/FontAwesome.svelte';
   import uniqueID from 'lodash-es/uniqueId';
-  import type { MermaidConfig } from 'mermaid';
   import { mode } from 'mode-watcher';
   import { onMount } from 'svelte';
   import { Svg2Roughjs } from 'svg2roughjs';
@@ -56,7 +55,7 @@
         // Do not render if there is no change in Code/Config/PanZoom
         if (
           code === state.code &&
-          config === state.mermaid &&
+          config === state.config &&
           rough === state.rough &&
           panZoom === state.panZoom
         ) {
@@ -68,7 +67,7 @@
         }
 
         code = state.code;
-        config = state.mermaid;
+        config = state.config;
         rough = state.rough;
         panZoom = state.panZoom ?? true;
 
@@ -83,7 +82,11 @@
           svg,
           bindFunctions,
           diagramType: detectedDiagramType
-        } = await renderDiagram(JSON.parse(state.mermaid) as MermaidConfig, code, viewID);
+        } = await renderDiagram(state.diagram, {
+          code,
+          config: state.config,
+          viewId: viewID
+        });
         diagramType = detectedDiagramType;
         if (svg.length > 0) {
           // eslint-disable-next-line svelte/no-dom-manipulating

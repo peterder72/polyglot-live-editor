@@ -6,13 +6,19 @@
   import { Button } from '$/components/ui/button';
   import { TID } from '$/constants';
   import { env } from '$/util/env';
-  import { stateStore, updateCode, updateConfig, urlsStore } from '$lib/util/state';
+  import {
+    diagramEngineStore,
+    stateStore,
+    updateCode,
+    updateConfig,
+    urlsStore
+  } from '$lib/util/state';
   import { debounce } from 'lodash-es';
   import ExclamationCircleIcon from '~icons/material-symbols/error-outline-rounded';
 
   const { isMobile } = $props<{ isMobile: boolean }>();
   const onUpdate = (text: string) => {
-    if ($stateStore.editorMode === 'code') {
+    if ($stateStore.editorMode === 'code' || !$diagramEngineStore.hasConfig) {
       updateCode(text);
     } else {
       updateConfig(text);
@@ -52,14 +58,14 @@
           <ExclamationCircleIcon class="size-6 text-destructive" aria-hidden="true" />
           <div class="flex flex-col">
             <p>Syntax error</p>
-            {#if env.isEnabledMermaidChartLinks && $stateStore.editorMode === 'code'}
+            {#if env.isEnabledMermaidChartLinks && $stateStore.editorMode === 'code' && $diagramEngineStore.id === 'mermaid'}
               <p class="text-xs text-white/60" data-testid={TID.aiHelpText}>
                 Create a free account to repair with AI
               </p>
             {/if}
           </div>
         </div>
-        {#if $stateStore.editorMode === 'code'}
+        {#if $stateStore.editorMode === 'code' && $diagramEngineStore.id === 'mermaid' && typeof $urlsStore.mermaidChart === 'function'}
           <McWrapper>
             <Button
               variant="accent"

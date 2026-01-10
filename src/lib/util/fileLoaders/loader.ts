@@ -15,7 +15,7 @@ export const loadDataFromUrl = async (): Promise<void> => {
   const configURL: string | undefined = searchParams.get('config') ?? undefined;
 
   let code: string | undefined;
-  const config = configURL ? await fetchText(configURL) : defaultState.mermaid;
+  const config = configURL ? await fetchText(configURL) : defaultState.config;
 
   if (codeURL) {
     code = await fetchText(codeURL);
@@ -34,7 +34,7 @@ export const loadDataFromUrl = async (): Promise<void> => {
         },
         type: 'files'
       },
-      mermaid: config
+      config
     };
   } else {
     for (const [key, value] of searchParams.entries()) {

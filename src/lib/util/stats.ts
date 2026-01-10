@@ -82,6 +82,7 @@ const delaysPerEvent = {
   bannerClick: defaultDelay,
   copyClipboard: defaultDelay,
   copyMarkdown: defaultDelay,
+  diagramEngineSelect: defaultDelay,
   download: defaultDelay,
   history: defaultDelay,
   loadGist: defaultDelay,

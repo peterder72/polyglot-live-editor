@@ -4,13 +4,30 @@
   import { Button } from '$/components/ui/button';
   import { Separator } from '$/components/ui/separator';
   import { TID } from '$/constants';
+  import { env } from '$/util/env';
+  import { diagramEngineStore } from '$/util/state';
   import { version } from 'mermaid/package.json';
   import { mode, setMode } from 'mode-watcher';
   import ThemeIcon from './ThemeIcon.svelte';
+
+  const engineLabel = $derived(() => {
+    if ($diagramEngineStore.id === 'mermaid') {
+      return `Mermaid v${version}`;
+    }
+    if ($diagramEngineStore.id === 'plantuml') {
+      try {
+        const url = new URL(env.plantumlServerUrl || 'https://www.plantuml.com/plantuml');
+        return `PlantUML (${url.hostname})`;
+      } catch {
+        return 'PlantUML';
+      }
+    }
+    return $diagramEngineStore.label;
+  });
 </script>
 
 <FloatingToolbar>
-  <span class="text-sm font-semibold opacity-60">v{version}</span>
+  <span class="text-sm font-semibold opacity-60">{engineLabel}</span>
   <Button variant="ghost" size="icon" title="Privacy & Security">
     <Privacy />
   </Button>

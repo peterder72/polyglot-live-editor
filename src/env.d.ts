@@ -6,6 +6,7 @@ interface ImportMetaEnv {
   readonly MERMAID_ANALYTICS_URL?: string;
   readonly MERMAID_DOMAIN?: string;
   readonly MERMAID_IS_ENABLED_MERMAID_CHART_LINKS?: string;
+  readonly PLANTUML_SERVER_URL?: string;
   // more env variables...
 }
 

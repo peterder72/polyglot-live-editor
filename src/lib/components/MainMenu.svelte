@@ -2,7 +2,7 @@
   import McWrapper from '$/components/McWrapper.svelte';
   import * as Popover from '$/components/ui/popover';
   import { Switch } from '$/components/ui/switch';
-  import { urlsStore } from '$/util/state';
+  import { diagramEngineStore, urlsStore } from '$/util/state';
   import { cn } from '$/utils';
   import { mode, setMode } from 'mode-watcher';
   import type { Component, Snippet } from 'svelte';
@@ -28,59 +28,78 @@
     renderer: (item: Omit<MenuItem, 'renderer'>) => ReturnType<Snippet>;
   }
 
-  const menuItems: MenuItem[] = $derived([
-    { label: 'New', icon: AddIcon, href: $urlsStore.new, renderer: menuItem },
-    { label: 'Duplicate', icon: DuplicateIcon, href: window.location.href, renderer: menuItem },
-    {
-      href: $urlsStore.mermaidChart({ medium: 'main_menu' }).playground,
-      icon: PlaygroundIcon,
-      isSectionEnd: true,
-      label: 'Edit in Playground',
-      renderer: mcMenuItem
-    },
-    {
-      label: 'Mermaid.js',
-      icon: MermaidTailIcon,
-      href: 'https://mermaid.js.org/',
+  const menuItems: MenuItem[] = $derived(() => {
+    const engine = $diagramEngineStore;
+    const items: MenuItem[] = [
+      { label: 'New', icon: AddIcon, href: $urlsStore.new, renderer: menuItem },
+      { label: 'Duplicate', icon: DuplicateIcon, href: window.location.href, renderer: menuItem }
+    ];
+
+    if (engine.id === 'mermaid' && typeof $urlsStore.mermaidChart === 'function') {
+      items.push({
+        href: $urlsStore.mermaidChart({ medium: 'main_menu' }).playground,
+        icon: PlaygroundIcon,
+        isSectionEnd: true,
+        label: 'Edit in Playground',
+        renderer: mcMenuItem
+      });
+    }
+
+    const docsHref = engine.getDocumentationUrl?.() ?? 'https://plantuml.com/';
+    items.push({
+      label: engine.id === 'mermaid' ? 'Mermaid.js' : `${engine.label}`,
+      icon: engine.id === 'mermaid' ? MermaidTailIcon : BookIcon,
+      href: engine.id === 'mermaid' ? 'https://mermaid.js.org/' : docsHref,
       renderer: menuItem
-    },
-    {
-      label: 'Documentation',
-      icon: BookIcon,
-      href: 'https://mermaid.js.org/intro/',
-      renderer: menuItem
-    },
-    {
-      label: 'Community',
-      icon: CommunityIcon,
-      href: 'https://discord.gg/sKeNQX4Wtj',
-      renderer: menuItem
-    },
-    {
-      checkDiagramType: false,
-      href: $urlsStore.mermaidChart({ medium: 'main_menu' }).plugins,
-      icon: PluginIcon,
-      label: 'Plugins',
-      renderer: mcMenuItem,
-      sharesData: false
-    },
-    {
+    });
+
+    if (engine.id === 'mermaid') {
+      items.push(
+        {
+          label: 'Documentation',
+          icon: BookIcon,
+          href: 'https://mermaid.js.org/intro/',
+          renderer: menuItem
+        },
+        {
+          label: 'Community',
+          icon: CommunityIcon,
+          href: 'https://discord.gg/sKeNQX4Wtj',
+          renderer: menuItem
+        },
+        {
+          checkDiagramType: false,
+          href: $urlsStore.mermaidChart({ medium: 'main_menu' }).plugins,
+          icon: PluginIcon,
+          label: 'Plugins',
+          renderer: mcMenuItem,
+          sharesData: false
+        }
+      );
+    }
+
+    items.push({
       href: '#',
       icon: ContrastIcon,
       isSectionEnd: true,
       label: 'Dark Mode',
       renderer: darkModeMenuItem
-    },
-    {
-      checkDiagramType: false,
-      class: 'text-accent border-b-0',
-      href: $urlsStore.mermaidChart({ medium: 'main_menu' }).home,
-      icon: MermaidChartIcon,
-      label: 'Mermaid',
-      renderer: mcMenuItem,
-      sharesData: false
+    });
+
+    if (engine.id === 'mermaid' && typeof $urlsStore.mermaidChart === 'function') {
+      items.push({
+        checkDiagramType: false,
+        class: 'text-accent border-b-0',
+        href: $urlsStore.mermaidChart({ medium: 'main_menu' }).home,
+        icon: MermaidChartIcon,
+        label: 'Mermaid',
+        renderer: mcMenuItem,
+        sharesData: false
+      });
     }
-  ]);
+
+    return items;
+  });
 </script>
 
 {#snippet menuItem(options: MenuItem)}

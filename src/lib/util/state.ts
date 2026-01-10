@@ -1,3 +1,5 @@
+import { defaultDiagramId, getDiagramEngine } from '$lib/diagram';
+import type { DiagramID } from '$lib/diagram';
 import { C } from '$/constants';
 import type { ErrorHash, MarkerData, State, ValidatedState } from '$/types';
 import { debounce } from 'lodash-es';
@@ -9,26 +11,39 @@ import {
   findMostRelevantLineNumber,
   replaceLineNumberInErrorMessage
 } from './errorHandling';
-import { parse } from './mermaid';
 import { localStorage, persist } from './persist';
 import { deserializeState, pakoSerde, serializeState } from './serde';
 import { errorDebug, formatJSON, MCBaseURL } from './util';
 
+const defaultEngine = getDiagramEngine(defaultDiagramId);
+
 export const defaultState: State = {
-  code: `flowchart TD
-    A[Christmas] -->|Get money| B(Go shopping)
-    B --> C{Let me think}
-    C -->|One| D[Laptop]
-    C -->|Two| E[iPhone]
-    C -->|Three| F[fa:fa-car Car]
-  `,
+  code: defaultEngine.defaultCode,
+  config: defaultEngine.defaultConfig ?? '',
+  diagram: defaultEngine.id,
   grid: true,
-  mermaid: formatJSON({
-    theme: 'default'
-  }),
   panZoom: true,
   rough: false,
   updateDiagram: true
+};
+
+const normalizeState = (state: State): State => {
+  const diagram = state.diagram ?? defaultDiagramId;
+  const engine = getDiagramEngine(diagram);
+  let config = state.config;
+  if (!config) {
+    config = state.mermaid ?? engine.defaultConfig ?? '';
+  }
+  if (!engine.hasConfig) {
+    config = engine.defaultConfig ?? '';
+  }
+  const editorMode = engine.hasConfig ? (state.editorMode ?? 'code') : 'code';
+  return {
+    ...state,
+    config,
+    diagram,
+    editorMode
+  };
 };
 
 const urlParseFailedState = `flowchart TD
@@ -46,10 +61,9 @@ const urlParseFailedState = `flowchart TD
 export const inputStateStore = persist(writable(defaultState), localStorage(), 'codeStore');
 
 export const currentState: ValidatedState = (() => {
-  const state = get(inputStateStore);
+  const state = normalizeState(get(inputStateStore));
   return {
     ...state,
-    editorMode: state.editorMode ?? 'code',
     error: undefined,
     errorMarkers: [],
     serialized: serializeState(state)
@@ -59,24 +73,28 @@ export const currentState: ValidatedState = (() => {
 let lastDiagramType = '';
 
 const processState = async (state: State) => {
+  const normalized = normalizeState(state);
   const processed: ValidatedState = {
-    ...state,
-    editorMode: state.editorMode ?? 'code',
+    ...normalized,
     error: undefined,
     errorMarkers: [],
     serialized: ''
   };
-  // No changes should be done to fields part of `state`.
   try {
-    processed.serialized = serializeState(state);
-    const { diagramType } = await parse(state.code);
-    processed.diagramType = diagramType;
-    if (lastDiagramType === 'zenuml' && diagramType !== lastDiagramType) {
-      // Temp Hack to refresh page after displaying ZenUML.
-      setTimeout(() => window.location.reload(), 500);
+    const engine = getDiagramEngine(normalized.diagram);
+    processed.serialized = serializeState(normalized);
+    if (engine.parse) {
+      const { diagramType } = await engine.parse(normalized.code, normalized.config);
+      processed.diagramType = diagramType;
+      if (engine.id === 'mermaid') {
+        if (lastDiagramType === 'zenuml' && diagramType && diagramType !== lastDiagramType) {
+          // Temp Hack to refresh page after displaying ZenUML.
+          setTimeout(() => window.location.reload(), 500);
+        }
+        lastDiagramType = diagramType ?? '';
+      }
     }
-    lastDiagramType = diagramType;
-    JSON.parse(state.mermaid);
+    engine.validateConfig?.(normalized.config);
   } catch (error) {
     processed.error = error as Error;
     errorDebug();
@@ -85,13 +103,13 @@ const processState = async (state: State) => {
       try {
         let errorString = processed.error.toString();
         const errorLineText = extractErrorLineText(errorString);
-        const realLineNumber = findMostRelevantLineNumber(errorLineText, state.code);
+        const realLineNumber = findMostRelevantLineNumber(errorLineText, normalized.code);
 
         let first_line: number, last_line: number, first_column: number, last_column: number;
         try {
           ({ first_line, last_line, first_column, last_column } = (error.hash as ErrorHash).loc);
         } catch {
-          const lineNo = findMostRelevantLineNumber(errorString, state.code);
+          const lineNo = findMostRelevantLineNumber(errorString, normalized.code);
           first_line = lineNo;
           last_line = lineNo + 1;
           first_column = 0;
@@ -129,15 +147,30 @@ export const stateStore: Readable<ValidatedState> = derived(
   currentState
 );
 
-export const urlsStore = derived([stateStore], ([{ code, serialized }]) => {
-  const { krokiRendererUrl, rendererUrl } = env;
-  const png = rendererUrl ? `${rendererUrl}/img/${serialized}?type=png` : '';
-  return {
-    kroki: krokiRendererUrl ? `${krokiRendererUrl}/mermaid/svg/${pakoSerde.serialize(code)}` : '',
-    mdCode: png
-      ? `[![](${png})](${window.location.protocol}//${window.location.host}${window.location.pathname}#${serialized})`
-      : '',
-    mermaidChart: ({
+export const diagramEngineStore = derived(stateStore, ($state) => getDiagramEngine($state.diagram));
+
+export const urlsStore = derived([stateStore], ([state]) => {
+  const engine = getDiagramEngine(state.diagram);
+  const assets = engine.getAssetUrls?.({ code: state.code, serialized: state.serialized }) ?? {};
+  const png = assets.png ?? '';
+  const svg = assets.svg ?? '';
+  const mdCode = png
+    ? `[![](${png})](${window.location.protocol}//${window.location.host}${window.location.pathname}#${state.serialized})`
+    : '';
+  const baseUrls: Record<string, unknown> = {
+    mdCode,
+    new: `${window.location.protocol}//${window.location.host}${window.location.pathname}#${serializeState(defaultState)}`,
+    png,
+    svg,
+    view: `/view#${state.serialized}`
+  };
+
+  if (engine.id === 'mermaid') {
+    const { krokiRendererUrl } = env;
+    baseUrls.kroki = krokiRendererUrl
+      ? `${krokiRendererUrl}/mermaid/svg/${pakoSerde.serialize(state.code)}`
+      : '';
+    baseUrls.mermaidChart = ({
       medium
     }: {
       medium: 'ai_repair' | 'main_menu' | 'save_diagram' | 'share' | 'toggle';
@@ -147,47 +180,53 @@ export const urlsStore = derived([stateStore], ([{ code, serialized }]) => {
         utm_medium: medium
       }).toString();
       return {
-        save: `${MCBaseURL}/app/plugin/save?state=${serialized}&${params}`,
-        playground: `${MCBaseURL}/play?${params}#${serialized}`,
+        save: `${MCBaseURL}/app/plugin/save?state=${state.serialized}&${params}`,
+        playground: `${MCBaseURL}/play?${params}#${state.serialized}`,
         plugins: `${MCBaseURL}/plugins?${params}`,
         home: `${MCBaseURL}/?${params}`
       };
-    },
-    new: `${window.location.protocol}//${window.location.host}${window.location.pathname}#${serializeState(defaultState)}`,
-    png,
-    svg: rendererUrl ? `${rendererUrl}/svg/${serialized}` : '',
-    view: `/view#${serialized}`
-  };
+    };
+  } else {
+    baseUrls.kroki = '';
+    baseUrls.mermaidChart = undefined;
+  }
+
+  if (assets.extras) {
+    Object.assign(baseUrls, assets.extras);
+  }
+
+  return baseUrls;
 });
 
 export const loadState = (data: string): void => {
   let state: State;
   console.log(`Loading '${data}'`);
   try {
-    state = deserializeState(data);
-    if (!state.mermaid) {
-      state.mermaid = defaultState.mermaid;
+    state = normalizeState(deserializeState(data));
+    const engine = getDiagramEngine(state.diagram);
+    if (engine.id === 'mermaid' && state.config) {
+      const mermaidConfig = JSON.parse(state.config) as MermaidConfig;
+      if (
+        mermaidConfig.securityLevel &&
+        mermaidConfig.securityLevel !== 'strict' &&
+        confirm(
+          `Removing "securityLevel":"${mermaidConfig.securityLevel}" from the config for safety.\nClick Cancel if you trust the source of this Diagram.`
+        )
+      ) {
+        delete mermaidConfig.securityLevel; // Prevent setting overriding securityLevel when loading state to mitigate possible XSS attack
+      }
+      state.config = formatJSON(mermaidConfig);
     }
-    const mermaidConfig: MermaidConfig =
-      typeof state.mermaid === 'string'
-        ? (JSON.parse(state.mermaid) as MermaidConfig)
-        : state.mermaid;
-    if (
-      mermaidConfig.securityLevel &&
-      mermaidConfig.securityLevel !== 'strict' &&
-      confirm(
-        `Removing "securityLevel":"${mermaidConfig.securityLevel}" from the config for safety.\nClick Cancel if you trust the source of this Diagram.`
-      )
-    ) {
-      delete mermaidConfig.securityLevel; // Prevent setting overriding securityLevel when loading state to mitigate possible XSS attack
+    if (engine.formatConfig) {
+      state.config = engine.formatConfig(state.config);
     }
-    state.mermaid = formatJSON(mermaidConfig);
   } catch (error) {
     state = get(inputStateStore);
     if (data) {
       console.error('Init error', error);
       state.code = urlParseFailedState;
-      state.mermaid = defaultState.mermaid;
+      state.config = defaultState.config;
+      state.diagram = defaultState.diagram;
     }
   }
   updateCodeStore(state);
@@ -197,7 +236,7 @@ let renderCount = 0;
 export const updateCodeStore = (newState: Partial<State>): void => {
   inputStateStore.update((state) => {
     renderCount++;
-    return { ...state, ...newState, renderCount };
+    return normalizeState({ ...state, ...newState, renderCount });
   });
 };
 
@@ -220,16 +259,43 @@ export const updateCode = (
 };
 
 export const updateConfig = (config: string): void => {
-  updateCodeStore({ mermaid: config });
+  updateCodeStore({ config });
+};
+
+export const setDiagramEngine = (diagram: DiagramID): void => {
+  const engine = getDiagramEngine(diagram);
+  inputStateStore.update((state) => {
+    const nextState = normalizeState({
+      ...state,
+      code: engine.defaultCode,
+      config: engine.defaultConfig ?? '',
+      diagram,
+      editorMode: engine.hasConfig ? (state.editorMode ?? 'code') : 'code',
+      pan: undefined,
+      updateDiagram: true,
+      zoom: undefined
+    });
+    return nextState;
+  });
 };
 
 export const toggleDarkTheme = (dark: boolean): void => {
   inputStateStore.update((state) => {
-    const config = JSON.parse(state.mermaid) as MermaidConfig;
-    if (!config.theme || ['dark', 'default'].includes(config.theme)) {
-      config.theme = dark ? 'dark' : 'default';
+    const normalized = normalizeState(state);
+    const engine = getDiagramEngine(normalized.diagram);
+    if (engine.id !== 'mermaid') {
+      return normalized;
     }
-    return { ...state, mermaid: formatJSON(config) };
+    try {
+      const config = JSON.parse(normalized.config) as MermaidConfig;
+      if (!config.theme || ['dark', 'default'].includes(config.theme)) {
+        config.theme = dark ? 'dark' : 'default';
+      }
+      normalized.config = formatJSON(config);
+    } catch (error) {
+      console.error('Unable to toggle theme for current configuration', error);
+    }
+    return normalized;
   });
 };
 
@@ -248,7 +314,7 @@ export const getStateString = (): string => {
 };
 
 export const verifyState = (): void => {
-  const state = get(inputStateStore);
+  const state = normalizeState(get(inputStateStore));
   if (!state.panZoom) {
     state.panZoom = true;
   }

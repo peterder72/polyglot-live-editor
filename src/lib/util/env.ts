@@ -3,5 +3,6 @@ export const env = {
   domain: import.meta.env.MERMAID_DOMAIN ?? '',
   isEnabledMermaidChartLinks: import.meta.env.MERMAID_IS_ENABLED_MERMAID_CHART_LINKS === 'true',
   krokiRendererUrl: import.meta.env.MERMAID_KROKI_RENDERER_URL ?? '',
+  plantumlServerUrl: import.meta.env.PLANTUML_SERVER_URL ?? '',
   rendererUrl: import.meta.env.MERMAID_RENDERER_URL ?? ''
 } as const;

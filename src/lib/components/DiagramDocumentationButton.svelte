@@ -2,8 +2,8 @@
   import { Button } from '$/components/ui/button';
   import { TID } from '$/constants';
   import type { DocumentationConfig } from '$/types';
-  import { standardizeDiagramType } from '$/util/mermaid';
-  import { stateStore } from '$/util/state';
+  import { standardizeDiagramType } from '$lib/diagram';
+  import { diagramEngineStore, stateStore } from '$/util/state';
   import BookIcon from '~icons/material-symbols/book-2-outline-rounded';
 
   const docURLBase = 'https://mermaid.js.org';
@@ -91,7 +91,15 @@
   } as const satisfies DocumentationConfig;
 
   const doc = $derived.by(() => {
+    const engine = $diagramEngineStore;
     const { editorMode, diagramType } = $stateStore;
+    if (engine.id !== 'mermaid') {
+      const url =
+        engine.getDocumentationUrl?.(diagramType) ??
+        engine.getDocumentationUrl?.() ??
+        'https://plantuml.com/';
+      return { key: diagramType ?? engine.label, url };
+    }
     if (!diagramType) {
       return { key: '', url: docURLBase };
     }

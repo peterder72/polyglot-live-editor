@@ -174,6 +174,10 @@
           }
           const intrinsicSize =
             state.diagram === 'plantuml' ? getIntrinsicSvgSize(graphDiv) : undefined;
+          const intrinsicWidthAttr =
+            state.diagram === 'plantuml' ? graphDiv.getAttribute('width') : null;
+          const intrinsicHeightAttr =
+            state.diagram === 'plantuml' ? graphDiv.getAttribute('height') : null;
           if (state.rough) {
             const svg2roughjs = new Svg2Roughjs('#container');
             svg2roughjs.svg = graphDiv;
@@ -193,8 +197,19 @@
             sketch.style.maxHeight = '100%';
             graphDiv = sketch;
           } else {
-            graphDiv.setAttribute('height', '100%');
-            graphDiv.setAttribute('width', '100%');
+            if (state.diagram === 'plantuml') {
+              if (intrinsicWidthAttr) {
+                graphDiv.setAttribute('width', intrinsicWidthAttr);
+              }
+              if (intrinsicHeightAttr) {
+                graphDiv.setAttribute('height', intrinsicHeightAttr);
+              }
+              graphDiv.style.width = '100%';
+              graphDiv.style.height = '100%';
+            } else {
+              graphDiv.setAttribute('height', '100%');
+              graphDiv.setAttribute('width', '100%');
+            }
             graphDiv.style.maxWidth = '100%';
             graphDiv.style.maxHeight = '100%';
             if (bindFunctions) {

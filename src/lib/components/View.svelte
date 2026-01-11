@@ -49,10 +49,41 @@
     return Number.isFinite(numeric) ? numeric : undefined;
   };
 
-  const normalizePlantumlSvg = (graphDiv: SVGSVGElement) => {
-    graphDiv.style.backgroundColor = 'transparent';
+  const getViewBoxSize = (graphDiv: SVGSVGElement) => {
+    const viewBox = graphDiv.getAttribute('viewBox');
+    if (!viewBox) {
+      return undefined;
+    }
+    const [, , width, height] = viewBox
+      .trim()
+      .split(/\s+/)
+      .map((value) => Number.parseFloat(value));
+    if (Number.isFinite(width) && Number.isFinite(height)) {
+      return { width, height };
+    }
+    return undefined;
+  };
+
+  const getIntrinsicSvgSize = (graphDiv: SVGSVGElement) => {
+    const viewBoxSize = getViewBoxSize(graphDiv);
+    if (viewBoxSize) {
+      return viewBoxSize;
+    }
     const width = parseSvgLength(graphDiv.getAttribute('width'));
     const height = parseSvgLength(graphDiv.getAttribute('height'));
+    if (!width || !height) {
+      return undefined;
+    }
+    return { width, height };
+  };
+
+  const normalizePlantumlSvg = (
+    graphDiv: SVGSVGElement,
+    intrinsicSize?: { width: number; height: number }
+  ) => {
+    graphDiv.style.backgroundColor = 'transparent';
+    const width = intrinsicSize?.width;
+    const height = intrinsicSize?.height;
     if (!graphDiv.getAttribute('viewBox') && width && height) {
       graphDiv.setAttribute('viewBox', `0 0 ${width} ${height}`);
     }
@@ -141,6 +172,8 @@
           if (!graphDiv.id) {
             graphDiv.id = viewID;
           }
+          const intrinsicSize =
+            state.diagram === 'plantuml' ? getIntrinsicSvgSize(graphDiv) : undefined;
           if (state.rough) {
             const svg2roughjs = new Svg2Roughjs('#container');
             svg2roughjs.svg = graphDiv;
@@ -169,7 +202,7 @@
             }
           }
           if (state.diagram === 'plantuml') {
-            normalizePlantumlSvg(graphDiv);
+            normalizePlantumlSvg(graphDiv, intrinsicSize);
           }
           if (state.panZoom) {
             handlePanZoom(state, graphDiv);

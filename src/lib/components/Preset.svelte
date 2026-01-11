@@ -5,7 +5,7 @@
   import { logEvent } from '$lib/util/stats';
   import ShapesIcon from '~icons/material-symbols/account-tree-outline-rounded';
 
-  const samples = $derived(() => $diagramEngineStore.sampleDiagrams);
+  const samples = $derived.by(() => $diagramEngineStore.sampleDiagrams ?? {});
 
   const loadSampleDiagram = (diagramType: string): void => {
     updateCode(samples[diagramType], {
@@ -24,12 +24,12 @@
     'Mindmap'
   ];
 
-  const diagramOrder = $derived(() => [
-    ...mainDiagrams,
-    ...Object.keys(samples)
-      .filter((key) => !mainDiagrams.includes(key))
-      .sort()
-  ]);
+  const diagramOrder = $derived.by(() => {
+    const sampleKeys = Object.keys(samples);
+    const primary = mainDiagrams.filter((key) => sampleKeys.includes(key));
+    const secondary = sampleKeys.filter((key) => !primary.includes(key)).sort();
+    return [...primary, ...secondary];
+  });
 </script>
 
 <Card title="Sample Diagrams" isOpen isStackable icon={{ component: ShapesIcon }}>

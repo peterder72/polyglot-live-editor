@@ -1,9 +1,9 @@
-import { diagramData } from '@mermaid-js/examples';
 import zenuml from '@mermaid-js/mermaid-zenuml';
 import type { MermaidConfig } from 'mermaid';
 import mermaid from 'mermaid';
 import { env } from '$lib/util/env';
 import type { DiagramAssetUrls, DiagramEngine } from './types';
+import { mermaidSamples } from './samples/mermaidSamples';
 
 let initPromise: Promise<void> | undefined;
 
@@ -29,27 +29,6 @@ const ensureMermaidReady = async () => {
 };
 
 const formatJSON = (data: unknown): string => JSON.stringify(data, undefined, 2);
-
-const getSampleDiagrams = () => {
-  type DiagramDefinition = (typeof diagramData)[number];
-
-  const isValidDiagram = (diagram: DiagramDefinition): diagram is Required<DiagramDefinition> => {
-    return Boolean(diagram.name && diagram.examples && diagram.examples.length > 0);
-  };
-
-  const diagrams = diagramData
-    .filter((diagram) => isValidDiagram(diagram))
-    .map(({ examples, ...rest }) => ({
-      ...rest,
-      example: examples?.filter(({ isDefault }) => isDefault)[0]
-    }));
-
-  const examples: Record<string, string> = {};
-  for (const diagram of diagrams) {
-    examples[diagram.name.replace(/ (Diagram|Chart|Graph)/, '')] = diagram.example.code;
-  }
-  return examples;
-};
 
 export const standardizeDiagramType = (diagramType: string) => {
   switch (diagramType) {
@@ -108,7 +87,7 @@ const mermaidEngine: DiagramEngine = {
     mermaid.initialize(parsedConfig);
     return await mermaid.render(id, code);
   },
-  sampleDiagrams: getSampleDiagrams(),
+  sampleDiagrams: mermaidSamples,
   validateConfig: (config) => {
     JSON.parse(config) as MermaidConfig;
   }

@@ -10,7 +10,7 @@
   import { mode, setMode } from 'mode-watcher';
   import ThemeIcon from './ThemeIcon.svelte';
 
-  const engineLabel = $derived(() => {
+  const engineLabel = $derived.by(() => {
     if ($diagramEngineStore.id === 'mermaid') {
       return `Mermaid v${version}`;
     }

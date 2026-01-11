@@ -41,6 +41,78 @@
     }
   };
 
+  const parseSvgLength = (value?: string | null) => {
+    if (!value) {
+      return undefined;
+    }
+    const numeric = Number.parseFloat(value);
+    return Number.isFinite(numeric) ? numeric : undefined;
+  };
+
+  const getViewBoxSize = (graphDiv: SVGSVGElement) => {
+    const viewBox = graphDiv.getAttribute('viewBox');
+    if (!viewBox) {
+      return undefined;
+    }
+    const [, , width, height] = viewBox
+      .trim()
+      .split(/\s+/)
+      .map((value) => Number.parseFloat(value));
+    if (Number.isFinite(width) && Number.isFinite(height)) {
+      return { width, height };
+    }
+    return undefined;
+  };
+
+  const getIntrinsicSvgSize = (graphDiv: SVGSVGElement) => {
+    const viewBoxSize = getViewBoxSize(graphDiv);
+    if (viewBoxSize) {
+      return viewBoxSize;
+    }
+    const width = parseSvgLength(graphDiv.getAttribute('width'));
+    const height = parseSvgLength(graphDiv.getAttribute('height'));
+    if (!width || !height) {
+      return undefined;
+    }
+    return { width, height };
+  };
+
+  const normalizePlantumlSvg = (
+    graphDiv: SVGSVGElement,
+    intrinsicSize?: { width: number; height: number }
+  ) => {
+    graphDiv.style.backgroundColor = 'transparent';
+    const width = intrinsicSize?.width;
+    const height = intrinsicSize?.height;
+    if (!graphDiv.getAttribute('viewBox') && width && height) {
+      graphDiv.setAttribute('viewBox', `0 0 ${width} ${height}`);
+    }
+    if (!width || !height) {
+      return;
+    }
+    const backgroundRects = Array.from(graphDiv.querySelectorAll('rect'));
+    for (const rect of backgroundRects) {
+      const fill = rect.getAttribute('fill')?.toLowerCase();
+      const rectWidth = parseSvgLength(rect.getAttribute('width'));
+      const rectHeight = parseSvgLength(rect.getAttribute('height'));
+      const rectX = parseSvgLength(rect.getAttribute('x')) ?? 0;
+      const rectY = parseSvgLength(rect.getAttribute('y')) ?? 0;
+      const isWhiteFill = fill && ['#ffffff', '#fff', 'white', 'rgb(255,255,255)'].includes(fill);
+      if (
+        isWhiteFill &&
+        rectWidth &&
+        rectHeight &&
+        rectWidth >= width &&
+        rectHeight >= height &&
+        rectX === 0 &&
+        rectY === 0
+      ) {
+        rect.setAttribute('fill', 'transparent');
+        rect.setAttribute('stroke', 'none');
+      }
+    }
+  };
+
   const handleStateChange = async (state: ValidatedState) => {
     const startTime = Date.now();
     if (state.error !== undefined) {
@@ -91,10 +163,21 @@
         if (svg.length > 0) {
           // eslint-disable-next-line svelte/no-dom-manipulating
           container.innerHTML = svg;
-          let graphDiv = document.querySelector<SVGSVGElement>(`#${viewID}`);
+          let graphDiv =
+            container.querySelector<SVGSVGElement>(`#${viewID}`) ??
+            container.querySelector<SVGSVGElement>('svg');
           if (!graphDiv) {
             throw new Error('graph-div not found');
           }
+          if (!graphDiv.id) {
+            graphDiv.id = viewID;
+          }
+          const intrinsicSize =
+            state.diagram === 'plantuml' ? getIntrinsicSvgSize(graphDiv) : undefined;
+          const intrinsicWidthAttr =
+            state.diagram === 'plantuml' ? graphDiv.getAttribute('width') : null;
+          const intrinsicHeightAttr =
+            state.diagram === 'plantuml' ? graphDiv.getAttribute('height') : null;
           if (state.rough) {
             const svg2roughjs = new Svg2Roughjs('#container');
             svg2roughjs.svg = graphDiv;
@@ -111,13 +194,30 @@
             sketch.setAttribute('width', '100%');
             sketch.setAttribute('viewBox', `0 0 ${width} ${height}`);
             sketch.style.maxWidth = '100%';
+            sketch.style.maxHeight = '100%';
             graphDiv = sketch;
           } else {
-            graphDiv.setAttribute('height', '100%');
+            if (state.diagram === 'plantuml') {
+              if (intrinsicWidthAttr) {
+                graphDiv.setAttribute('width', intrinsicWidthAttr);
+              }
+              if (intrinsicHeightAttr) {
+                graphDiv.setAttribute('height', intrinsicHeightAttr);
+              }
+              graphDiv.style.width = '100%';
+              graphDiv.style.height = '100%';
+            } else {
+              graphDiv.setAttribute('height', '100%');
+              graphDiv.setAttribute('width', '100%');
+            }
             graphDiv.style.maxWidth = '100%';
+            graphDiv.style.maxHeight = '100%';
             if (bindFunctions) {
               bindFunctions(graphDiv);
             }
+          }
+          if (state.diagram === 'plantuml') {
+            normalizePlantumlSvg(graphDiv, intrinsicSize);
           }
           if (state.panZoom) {
             handlePanZoom(state, graphDiv);

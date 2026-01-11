@@ -1,6 +1,7 @@
 import { deflateRaw } from 'pako';
 import { env } from '$lib/util/env';
 import type { DiagramAssetUrls, DiagramEngine } from './types';
+import { plantumlSamples } from './samples/plantumlSamples';
 
 const PLANTUML_DEFAULT_SERVER = 'https://www.plantuml.com/plantuml';
 
@@ -66,12 +67,6 @@ const requestPlantUml = async (code: string, format: 'svg' | 'png' = 'svg') => {
     throw new Error(`PlantUML render failed: ${response.status} ${response.statusText}\n${body}`);
   }
   return await response.text();
-};
-
-const plantumlSamples: Record<string, string> = {
-  Sequence: `@startuml\nAlice -> Bob: Authentication Request\nBob --> Alice: Authentication Response\n@enduml`,
-  Component: `@startuml\nactor User\nrectangle System {\n  User -- (Login)\n  (Login) --> Database\n}\n@enduml`,
-  UseCase: `@startuml\nleft to right direction\nactor Customer\nactor Clerk\nrectangle Checkout {\n  Customer -- (Place order)\n  (Place order) .> (Pay) : include\n  (Pay) -- Clerk\n}\n@enduml`
 };
 
 const plantumlEngine: DiagramEngine = {

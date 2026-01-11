@@ -5,40 +5,7 @@
   import { logEvent } from '$lib/util/stats';
   import ShapesIcon from '~icons/material-symbols/account-tree-outline-rounded';
 
-  const extras = {
-    ZenUML: `zenuml
-    title Order Service
-    @Actor Client #FFEBE6
-    @Boundary OrderController #0747A6
-    @EC2 <<BFF>> OrderService #E3FCEF
-    group BusinessService {
-      @Lambda PurchaseService
-      @AzureFunction InvoiceService
-    }
-
-    @Starter(Client)
-    // \`POST /orders\`
-    OrderController.post(payload) {
-      OrderService.create(payload) {
-        order = new Order(payload)
-        if(order != null) {
-          par {
-            PurchaseService.createPO(order)
-            InvoiceService.createInvoice(order)      
-          }      
-        }
-      }
-    }
-    `
-  };
-
-  const samples = $derived(() => {
-    const baseSamples = $diagramEngineStore.sampleDiagrams;
-    if ($diagramEngineStore.id === 'mermaid') {
-      return { ...baseSamples, ...extras };
-    }
-    return baseSamples;
-  });
+  const samples = $derived.by(() => $diagramEngineStore.sampleDiagrams ?? {});
 
   const loadSampleDiagram = (diagramType: string): void => {
     updateCode(samples[diagramType], {
@@ -57,12 +24,12 @@
     'Mindmap'
   ];
 
-  const diagramOrder = $derived(() => [
-    ...mainDiagrams,
-    ...Object.keys(samples)
-      .filter((key) => !mainDiagrams.includes(key))
-      .sort()
-  ]);
+  const diagramOrder = $derived.by(() => {
+    const sampleKeys = Object.keys(samples);
+    const primary = mainDiagrams.filter((key) => sampleKeys.includes(key));
+    const secondary = sampleKeys.filter((key) => !primary.includes(key)).sort();
+    return [...primary, ...secondary];
+  });
 </script>
 
 <Card title="Sample Diagrams" isOpen isStackable icon={{ component: ShapesIcon }}>
